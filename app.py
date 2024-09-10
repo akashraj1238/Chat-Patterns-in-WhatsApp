@@ -1,72 +1,117 @@
 import streamlit as st
-import preprocessor, helper
+import preprocessor
+import helper
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-
+# App Title
 st.sidebar.title("WhatsApp Conversation Tracker")
 
-uploaded_file = st.sidebar.file_uploader("Choose a file")
+# File Uploader
+uploaded_file = st.sidebar.file_uploader("Upload your WhatsApp chat file (txt format)")
+
+# Process file when uploaded
 if uploaded_file is not None:
-    try:
-        bytes_data = uploaded_file.getvalue()
-        data = bytes_data.decode("utf-8")
-        df = preprocessor.preprocess(data)
+    data = uploaded_file.getvalue().decode("utf-8")
+    df = preprocessor.preprocess(data)
 
-        if df.empty:
-            st.error("The uploaded file doesn't contain any valid data.")
-        else:
-            st.dataframe(df)
+    # List of users excluding group notifications
+    users = df['user'].unique().tolist()
+    if 'group_notification' in users:
+        users.remove('group_notification')
+    users.sort()
+    users.insert(0, "Overall")  # Add option for overall stats
 
-            user_list = df['user'].unique().tolist()
-            if 'group_notification' in user_list:
-                user_list.remove('group_notification')
-            user_list.sort()
-            user_list.insert(0, 'Overall')
-            selected_user = st.sidebar.selectbox("Choose a user", user_list)
+    # User selection dropdown
+    selected_user = st.sidebar.selectbox("Analyze chat for", users)
 
-            if st.sidebar.button('Show Analysis'):
-                try:
-                    num_of_messages, words, media_shared, link_shared = helper.fetch_stats(selected_user, df)
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.header("Total Messages")
-                        st.title(num_of_messages)
-                    with col2:
-                        st.header("Total Words")
-                        st.title(words)
-                    with col3:
-                        st.header("Media Shared")
-                        st.title(media_shared)
-                    with col4:
-                        st.header("Link Shared")
-                        st.title(link_shared)
+    # Display Analysis
+    if st.sidebar.button("Generate Analysis"):
 
-                    # Finding the busiest user in the group (group level)
-                    if selected_user == 'Overall':
-                        st.title("Most Busy Users")
-                        x, new_df = helper.most_busy_users(df)
-                        fig, ax = plt.subplots()
+        # Top Statistics
+        st.title("Chat Summary")
+        num_messages, total_words, media_messages, link_count = helper.fetch_stats(selected_user, df)
+        st.write("**Total Messages:**", num_messages)
+        st.write("**Total Words:**", total_words)
+        st.write("**Media Files Shared:**", media_messages)
+        st.write("**Links Shared:**", link_count)
 
-                        col1, col2 = st.columns(2)
+        # Monthly Activity Timeline
+        st.title("Monthly Chat Activity")
+        monthly_data = helper.monthly_timeline(selected_user, df)
+        fig, ax = plt.subplots()
+        ax.plot(monthly_data['time'], monthly_data['message'], color='green')
+        plt.xticks(rotation='vertical')
+        st.pyplot(fig)
 
-                        with col1:
-                            ax.bar(x.index, x.values, color='red')
-                            plt.xticks(rotation='vertical')
-                            st.pyplot(fig)
+        # Daily Activity Timeline
+        st.title("Daily Chat Activity")
+        daily_data = helper.daily_timeline(selected_user, df)
+        fig, ax = plt.subplots()
+        ax.plot(daily_data['only_date'], daily_data['message'], color='black')
+        plt.xticks(rotation='vertical')
+        st.pyplot(fig)
 
-                        with col2:
-                            st.dataframe(new_df)
+        # Activity Distribution (Days and Months)
+        st.title("Activity Patterns")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Most Active Days")
+            busy_days = helper.week_activity_map(selected_user, df)
+            fig, ax = plt.subplots()
+            ax.bar(busy_days.index, busy_days.values, color='purple')
+            plt.xticks(rotation='vertical')
+            st.pyplot(fig)
+        with col2:
+            st.subheader("Most Active Months")
+            busy_months = helper.month_activity_map(selected_user, df)
+            fig, ax = plt.subplots()
+            ax.bar(busy_months.index, busy_months.values, color='orange')
+            plt.xticks(rotation='vertical')
+            st.pyplot(fig)
 
-                    # WordCloud
-                    st.title("Word Cloud")
-                    df_wc = helper.create_wordcloud(selected_user, df)
-                    fig, ax = plt.subplots()
-                    ax.imshow(df_wc)
-                    ax.axis("off")  # Hide axes
-                    st.pyplot(fig)
-                except Exception as e:
-                    st.error(f"An error occurred during analysis: {e}")
+        # Heatmap for User Activity
+        st.title("Hourly Activity Heatmap")
+        heatmap_data = helper.activity_heatmap(selected_user, df)
+        fig, ax = plt.subplots()
+        sns.heatmap(heatmap_data, ax=ax, cmap="coolwarm")
+        st.pyplot(fig)
 
-    except Exception as e:
-        st.error(f"An error occurred while processing the file: {e}")
+        # Most Active Users (Group-Level)
+        if selected_user == "Overall":
+            st.title("Most Active Users")
+            top_users, user_percent = helper.most_busy_users(df)
+            fig, ax = plt.subplots()
+            col1, col2 = st.columns(2)
+            with col1:
+                ax.bar(top_users.index, top_users.values, color='red')
+                plt.xticks(rotation='vertical')
+                st.pyplot(fig)
+            with col2:
+                st.write(user_percent)
 
+        # Wordcloud
+        st.title("Frequent Words")
+        wordcloud = helper.create_wordcloud(selected_user, df)
+        fig, ax = plt.subplots()
+        ax.imshow(wordcloud)
+        st.pyplot(fig)
+
+        # Most Common Words
+        st.title("Most Common Words")
+        common_words = helper.most_common_words(selected_user, df)
+        fig, ax = plt.subplots()
+        ax.barh(common_words[0], common_words[1], color='blue')
+        plt.xticks(rotation='vertical')
+        st.pyplot(fig)
+
+        # Emoji Analysis
+        st.title("Emoji Usage")
+        emoji_data = helper.emoji_helper(selected_user, df)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(emoji_data)
+        with col2:
+            fig, ax = plt.subplots()
+            ax.pie(emoji_data[1].head(), labels=emoji_data[0].head(), autopct="%0.2f")
+            st.pyplot(fig)
