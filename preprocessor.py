@@ -2,14 +2,18 @@ import re
 import pandas as pd
 
 def preprocess(data):
-    pattern = '\d{1,2}/\d{1,2}/\d{2,4},\s\d{1,2}:\d{2}\s-\s'
+    # Adjusted pattern to handle both 12-hour and 24-hour timestamps
+    pattern = '\d{1,2}/\d{1,2}/\d{2,4},\s\d{1,2}:\d{2}\s?(?:AM|PM|am|pm)?\s?-\s'
     messages = re.split(pattern, data)[1:]
     dates = re.findall(pattern, data)
 
     df = pd.DataFrame({'user_message': messages, 'message_date': dates})
 
     # Using dayfirst=True to handle day/month order
-    df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%y, %H:%M - ', errors='coerce', dayfirst=True)
+    df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%y, %I:%M %p - ', errors='coerce', dayfirst=True)
+
+    # Fallback to 24-hour format in case 12-hour parsing fails
+    df['message_date'] = df['message_date'].fillna(pd.to_datetime(df['message_date'], format='%d/%m/%y, %H:%M - ', errors='coerce', dayfirst=True))
 
     df.rename(columns={'message_date': 'date'}, inplace=True)
 
@@ -28,6 +32,7 @@ def preprocess(data):
     df['message'] = messages
     df.drop(columns=['user_message'], inplace=True)
 
+    # Extract additional date and time components
     df['only_date'] = df['date'].dt.date
     df['year'] = df['date'].dt.year
     df['month_num'] = df['date'].dt.month
@@ -37,6 +42,7 @@ def preprocess(data):
     df['hour'] = df['date'].dt.hour
     df['minute'] = df['date'].dt.minute
 
+    # Creating time periods for better analysis
     period = []
     for hour in df[['day_name', 'hour']]['hour']:
         if hour == 23:
