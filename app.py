@@ -27,7 +27,6 @@ if uploaded_file is not None:
 
     # Display Analysis
     if st.sidebar.button("Generate Analysis"):
-
         # Top Statistics
         st.title("Chat Summary")
         num_messages, total_words, media_messages, link_count = helper.fetch_stats(selected_user, df)
@@ -73,9 +72,13 @@ if uploaded_file is not None:
         # Heatmap for User Activity
         st.title("Hourly Activity Heatmap")
         heatmap_data = helper.activity_heatmap(selected_user, df)
-        fig, ax = plt.subplots()
-        sns.heatmap(heatmap_data, ax=ax, cmap="coolwarm")
-        st.pyplot(fig)
+
+        if heatmap_data is not None and not heatmap_data.empty:
+            fig, ax = plt.subplots()
+            sns.heatmap(heatmap_data, ax=ax, cmap="coolwarm")
+            st.pyplot(fig)
+        else:
+            st.write("No activity data available for the selected user.")
 
         # Most Active Users (Group-Level)
         if selected_user == "Overall":
@@ -101,7 +104,7 @@ if uploaded_file is not None:
         st.title("Most Common Words")
         common_words = helper.most_common_words(selected_user, df)
         fig, ax = plt.subplots()
-        ax.barh(common_words[0], common_words[1], color='blue')
+        ax.barh(common_words['Word'], common_words['Count'], color='blue')
         plt.xticks(rotation='vertical')
         st.pyplot(fig)
 
@@ -113,5 +116,5 @@ if uploaded_file is not None:
             st.write(emoji_data)
         with col2:
             fig, ax = plt.subplots()
-            ax.pie(emoji_data[1].head(), labels=emoji_data[0].head(), autopct="%0.2f")
+            ax.pie(emoji_data['Count'], labels=emoji_data['Emoji'], autopct="%0.2f%%")
             st.pyplot(fig)
