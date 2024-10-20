@@ -18,7 +18,7 @@ def fetch_stats(selected_user, df):
 
 def most_busy_users(df):
     user_count = df['user'].value_counts().head()
-    user_percent = (df['user'].value_counts(normalize=True) * 100).reset_index().rename(columns={'index': 'user', 'user': 'percent'})
+    user_percent = (df['user'].value_counts(normalize=True) * 100).reset_index().rename(columns={'user': 'user', 'proportion':'percentage'})
     return user_count, user_percent
 
 def create_wordcloud(selected_user, df):
